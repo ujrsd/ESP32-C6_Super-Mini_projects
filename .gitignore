@@ -1,0 +1,9 @@
+*.exe
+*.obj
+*.pdb
+*.tmp
+*.ilk
+
+.vscode/
+.idea/
+.USB-driver/
