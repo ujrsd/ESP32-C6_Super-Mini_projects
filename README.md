@@ -1,4 +1,4 @@
-# Coding in Adruino
+# Coding with Adruino
 
 ## 0. Setup
 
