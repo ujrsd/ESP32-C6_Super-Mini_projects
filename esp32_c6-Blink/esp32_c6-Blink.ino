@@ -1,4 +1,5 @@
 #include <Adafruit_NeoPixel.h>
+#include <Wire.h>
 
 #define LED_PIN 8
 #define LED_COUNT 1
@@ -12,6 +13,11 @@ void setColor(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void setup() {
+  Serial.begin(115200);
+  Wire.begin(8,9); // Pin8 = SDA, Pin9 = SCL
+  Serial.println("I2C scan...");
+
+
   strip.begin();
   strip.setBrightness(50);
   strip.show();
