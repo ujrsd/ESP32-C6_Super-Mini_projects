@@ -35,6 +35,74 @@ byte checkForDevice() {
   return 255;
 }
 
+double calc_temp(uint8_t MSB_temp, uint8_t LSB_temp) {
+  // From the datasheet:
+  // T = (-45 + 175*(S_T)/(2^16-1))
+
+  uint32_t value = ((uint16_t) MSB_temp << 8) | ((uint16_t) MSB_temp << 0);
+  double res = -45 + (175.0 * value)/((1UL << 16)-1); // 2^16 = (1UL << 16)
+  res = (int)(res*10)/10.0;
+
+  return res;
+}
+
+double calc_humi(uint8_t MSB_humi, uint8_t LSB_humi) {
+  // From the datasheet:
+  // RH = (-6 + 125*(S_RH)/(2^16-1)) can reach < 0 and > 100
+
+  uint32_t value = ((uint16_t) MSB_humi << 8) | ((uint16_t) LSB_humi << 0);
+  double res = -6 + (125.0 * value)/((1UL << 16)-1); // 2^16 = (1UL << 16)
+  res = (int)(res*10)/10.0;
+
+  if(res < 0) {
+    res = 0;
+  }
+
+  if(res > 100) {
+    res = 100;
+  }
+
+  return res;
+}
+
+void printI2CData(const uint8_t* data, size_t length) {
+  Serial.print("Raw bytes: ");
+  for(int i = 0; i < length; i++) {
+    Serial.print(data[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+}
+
+template <typename T>
+void printInformation(String name, T value , String physicalUnit) {
+  Serial.print(name);
+  Serial.print(": ");
+  Serial.print(value);
+  Serial.print(" ");
+  Serial.println(physicalUnit);
+}
+
+void setLEDColorByHumidity(double humidity) {
+  if(humidity > 80) {
+    setColor(255, 0, 0); // Red
+  } else if(humidity >= 75) {
+    setColor(255, 50, 0); // Red-Orange
+  } else if(humidity >= 70) {
+    setColor(255, 150, 0); // Orange
+  } else if(humidity >= 65) {
+    setColor(255, 255, 0); // Yellow
+  } else if(humidity >= 60) {
+    setColor(144, 238, 0); // Light Green
+  } else if(humidity >= 55) {
+    setColor(0, 255, 0); // Green
+  } else if(humidity >= 50) {
+    setColor(0, 205, 50); // Green-Light blue
+  } else if(humidity >= 45) {
+    setColor(0, 155, 100); // light blue
+  }
+}
+
 // Pseudo Code !!!
 bool CRC_check(uint8_t MSB_byte, uint8_t LSB_byte, uint8_t CRC_checksum) {
   uint8_t byte_init = 0xFF;
@@ -97,35 +165,35 @@ void loop() {
     uint8_t count = Wire.requestFrom(SHT40_addr, (uint8_t)6);
 
     if (count == 6) {
-      uint8_t MSB_temp = Wire.read();
-      uint8_t LSB_temp = Wire.read();
-      uint8_t CRC_temp = Wire.read();
-      uint8_t MSB_humi = Wire.read();
-      uint8_t LSB_humi = Wire.read();
-      uint8_t CRC_humi = Wire.read();
+      uint8_t data[count] = {0};
 
-      Serial.print("Raw bytes: ");
-      Serial.print(MSB_temp, HEX);
-      Serial.print(" ");
-      Serial.print(LSB_temp, HEX);
-      Serial.print(" ");
-      Serial.print(CRC_temp, HEX);
-      Serial.print(" ");
-      Serial.print(MSB_humi, HEX);
-      Serial.print(" ");
-      Serial.print(LSB_humi, HEX);
-      Serial.print(" ");
-      Serial.print(CRC_humi, HEX);
-      Serial.print(" ");
-      Serial.println();
+      for (int i = 0; i < count; i++) {
+        data[i] = Wire.read();
+      }
 
-      CRC_check(MSB_temp, LSB_temp, CRC_temp);
+      uint8_t MSB_temp = data[0];
+      uint8_t LSB_temp = data[1];
+      uint8_t CRC_temp = data[2];
+      uint8_t MSB_humi = data[3];
+      uint8_t LSB_humi = data[4];
+      uint8_t CRC_humi = data[5];
+
+      printI2CData(data, count);
+
+      //CRC_check(MSB_temp, LSB_temp, CRC_temp);
+      double temperature = calc_temp(MSB_temp, LSB_temp);
+      printInformation("Temperature", temperature, "°C");
+
+      double humidity = calc_humi(MSB_humi, LSB_humi);
+      printInformation("Humidity", humidity, "%RH");
+      setLEDColorByHumidity(humidity);
+
     } else {
       Serial.print("I2C read error, bytes received: ");
       Serial.println(count);
     }
 
-    delay(10000);
+    delay(2000);
 
   } else {
     setColor(255,0,0);
